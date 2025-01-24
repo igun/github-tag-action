@@ -206,11 +206,11 @@ then
     then
         if $with_v
         then
-            new=v$(semver -i prerelease "${pre_tag}" --preid "${suffix}")
+            new="v$new-$suffix"
         else
-            new=$(semver -i prerelease "${pre_tag}" --preid "${suffix}")
+            new="$new-$suffix"
         fi
-        echo -e "Bumping ${suffix} pre-tag ${pre_tag}. New pre-tag ${new}"
+        echo -e "Using existing pre-tag format for ${pre_tag}. New pre-tag ${new}"
     else
         if $with_v
         then
