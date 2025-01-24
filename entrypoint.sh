@@ -230,6 +230,21 @@ then
     new="$custom_tag"
 fi
 
+
+# Check if the tag already exists on the remote
+if git rev-parse "$new" >/dev/null 2>&1; then
+    echo "Tag $new already exists. Incrementing version..."
+    # Extract the base version (without suffix) and increment the patch version
+    base_version=$(echo "$new" | sed -E 's/-.*//') # Remove suffix
+    new_version=$(semver -i patch "$base_version") # Increment the patch version
+    if $with_v; then
+        new="v$new_version-$suffix"
+    else
+        new="$new_version-$suffix"
+    fi
+    echo "New incremented tag: $new"
+fi
+
 # set outputs
 setOutput "new_tag" "$new"
 setOutput "part" "$part"
