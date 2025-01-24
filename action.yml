@@ -1,6 +1,6 @@
-name: 'Github Tag Bump'
+name: 'Github Tag Auto Bump'
 description: 'Bump and push git tag on merge'
-author: 'Nick Sjostrom'
+author: 'Gunawan Prasetia'
 runs:
   using: 'docker'
   image: 'Dockerfile'
