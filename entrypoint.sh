@@ -85,7 +85,7 @@ echo "pre_release = $pre_release"
 git fetch --tags
 
 tagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+$"
-preTagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix\.[0-9]+)$"
+preTagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix)$"
 
 # get the git refs
 git_refs=
@@ -192,25 +192,20 @@ esac
 if $pre_release
 then
     # get current commit hash for tag
-    pre_tag_commit=$(git rev-list -n 1 "$pre_tag" || true)
+    pre_tag_commit=$(git rev-list -n 1 "$pre_tag" || true )
     # skip if there are no new commits for pre_release
-    if [ "$pre_tag_commit" == "$commit" ] &&  [ "$force_without_changes_pre" == "false" ] 
+    if [ "$pre_tag_commit" == "$commit" ] && [ "$force_without_changes_pre" == "false" ]
     then
         echo "No new commits since previous pre_tag. Skipping..."
         setOutput "new_tag" "$pre_tag"
         setOutput "tag" "$pre_tag"
         exit 0
     fi
-    # already a pre-release available, bump it
-    if [[ "$pre_tag" =~ $new ]] && [[ "$pre_tag" =~ $suffix ]]
+    # cek apakah pre_tag sudah memiliki suffix tanpa angka
+    if [[ "$pre_tag" =~ $suffix$ ]]
     then
-        if $with_v
-        then
-            new="v$new-$suffix"
-        else
-            new="$new-$suffix"
-        fi
-        echo -e "Using existing pre-tag format for ${pre_tag}. New pre-tag ${new}"
+        echo "Prerelease suffix already set without number. Keeping it as is."
+        new="$pre_tag"
     else
         if $with_v
         then
