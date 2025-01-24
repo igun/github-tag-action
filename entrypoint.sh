@@ -5,7 +5,7 @@ set -eo pipefail
 # config
 default_semvar_bump=${DEFAULT_BUMP:-minor}
 default_branch=${DEFAULT_BRANCH:-$GITHUB_BASE_REF} # get the default branch from github runner env vars
-with_v=${WITH_V:-false}
+with_v=${WITH_V:-true}  # Set default to true to prepend 'v'
 release_branches=${RELEASE_BRANCHES:-master,main}
 custom_tag=${CUSTOM_TAG:-}
 source=${SOURCE:-.}
@@ -22,7 +22,7 @@ patch_string_token=${PATCH_STRING_TOKEN:-#patch}
 none_string_token=${NONE_STRING_TOKEN:-#none}
 branch_history=${BRANCH_HISTORY:-compare}
 force_without_changes=${FORCE_WITHOUT_CHANGES:-false}
-force_without_changes_pre=${FORCE_WITHOUT_CHANGES:-false}
+force_without_changes_pre=${FORCE_WITHOUT_CHANGES_PRE:-false}
 tag_message=${TAG_MESSAGE:-""}
 
 # since https://github.blog/2022-04-12-git-security-vulnerability-announced/ runner uses?
@@ -85,7 +85,7 @@ echo "pre_release = $pre_release"
 git fetch --tags
 
 tagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+$"
-preTagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix\.[0-9]+)$"
+preTagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix)$"
 
 # get the git refs
 git_refs=
@@ -124,6 +124,11 @@ then
             pre_tag="$initial_version"
         fi
     fi
+fi
+
+# Ensure that the 'v' prefix is not duplicated
+if $with_v && [[ $tag != v* ]]; then
+    tag="v$tag"
 fi
 
 # get current commit hash for tag
@@ -192,7 +197,7 @@ esac
 if $pre_release
 then
     # get current commit hash for tag
-    pre_tag_commit=$(git rev-list -n 1 "$pre_tag" || true)
+    pre_tag_commit=$(git rev-list -n 1 "$pre_tag" || true )
     # skip if there are no new commits for pre_release
     if [ "$pre_tag_commit" == "$commit" ] &&  [ "$force_without_changes_pre" == "false" ] 
     then
@@ -201,19 +206,11 @@ then
         setOutput "tag" "$pre_tag"
         exit 0
     fi
-    # already a pre-release available, bump it
-    if [[ "$pre_tag" =~ $new ]] && [[ "$pre_tag" =~ $suffix ]]
+    # cek apakah pre_tag sudah memiliki suffix tanpa angka
+    if [[ "$pre_tag" =~ $suffix$ ]]
     then
-        # Hapus angka setelah suffix menggunakan parameter sed
-        pre_tag_without_num=$(echo "$pre_tag" | sed "s/\.[0-9]*$//")
-        
-        if $with_v
-        then
-            new=v$(semver -i prerelease "${pre_tag_without_num}" --preid "${suffix}")
-        else
-            new=$(semver -i prerelease "${pre_tag_without_num}" --preid "${suffix}")
-        fi
-        echo -e "Bumping ${suffix} pre-tag ${pre_tag}. New pre-tag ${new}"
+        echo "Prerelease suffix already set without number. Keeping it as is."
+        new="$pre_tag"
     else
         if $with_v
         then
@@ -227,7 +224,9 @@ then
 else
     if $with_v
     then
-        new="v$new"
+        # Remove existing 'v' if present to prevent duplication
+        new_version=$(echo "$new" | sed 's/^v//')
+        new="v$new_version"
     fi
     echo -e "Bumping tag ${tag} - New tag ${new}"
 fi
@@ -235,7 +234,22 @@ fi
 # as defined in readme if CUSTOM_TAG is used any semver calculations are irrelevant.
 if [ -n "$custom_tag" ]
 then
-    new="$custom_tag"
+    # Ensure 'v' is prefixed to CUSTOM_TAG if with_v is true and it's not already prefixed
+    if $with_v && [[ "$custom_tag" != v* ]]; then
+        new="v$custom_tag"
+    else
+        new="$custom_tag"
+    fi
+fi
+
+# Check if the new tag already exists
+if git rev-parse "$new" >/dev/null 2>&1; then
+    echo "::error::Tag $new already exists. Skipping tag creation."
+    setOutput "new_tag" "$new"
+    setOutput "tag" "$new"
+    setOutput "old_tag" "$tag"
+    setOutput "part" "$part"
+    exit 0
 fi
 
 # set outputs
