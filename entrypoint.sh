@@ -85,7 +85,7 @@ echo "pre_release = $pre_release"
 git fetch --tags
 
 tagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+$"
-preTagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix)$"
+preTagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix\.[0-9]+)$"
 
 # get the git refs
 git_refs=
@@ -192,20 +192,28 @@ esac
 if $pre_release
 then
     # get current commit hash for tag
-    pre_tag_commit=$(git rev-list -n 1 "$pre_tag" || true )
+    pre_tag_commit=$(git rev-list -n 1 "$pre_tag" || true)
     # skip if there are no new commits for pre_release
-    if [ "$pre_tag_commit" == "$commit" ] && [ "$force_without_changes_pre" == "false" ]
+    if [ "$pre_tag_commit" == "$commit" ] &&  [ "$force_without_changes_pre" == "false" ] 
     then
         echo "No new commits since previous pre_tag. Skipping..."
         setOutput "new_tag" "$pre_tag"
         setOutput "tag" "$pre_tag"
         exit 0
     fi
-    # cek apakah pre_tag sudah memiliki suffix tanpa angka
-    if [[ "$pre_tag" =~ $suffix$ ]]
+    # already a pre-release available, bump it
+    if [[ "$pre_tag" =~ $new ]] && [[ "$pre_tag" =~ $suffix ]]
     then
-        echo "Prerelease suffix already set without number. Keeping it as is."
-        new="$pre_tag"
+        # Hapus angka setelah suffix menggunakan parameter sed
+        pre_tag_without_num=$(echo "$pre_tag" | sed "s/\.[0-9]*$//")
+        
+        if $with_v
+        then
+            new=v$(semver -i prerelease "${pre_tag_without_num}" --preid "${suffix}")
+        else
+            new=$(semver -i prerelease "${pre_tag_without_num}" --preid "${suffix}")
+        fi
+        echo -e "Bumping ${suffix} pre-tag ${pre_tag}. New pre-tag ${new}"
     else
         if $with_v
         then
@@ -228,36 +236,6 @@ fi
 if [ -n "$custom_tag" ]
 then
     new="$custom_tag"
-fi
-
-
-# Check if the new tag already exists
-if git rev-parse "$new" >/dev/null 2>&1; then
-    echo "Tag $new already exists. Incrementing further..."
-    case "$part" in
-        major)
-            new=$(semver -i major "$new")
-            ;;
-        minor)
-            new=$(semver -i minor "$new")
-            ;;
-        patch)
-            new=$(semver -i patch "$new")
-            ;;
-        pre-major)
-            new=$(semver -i major "$new")
-            new="$new-$suffix"
-            ;;
-        pre-minor)
-            new=$(semver -i minor "$new")
-            new="$new-$suffix"
-            ;;
-        pre-patch)
-            new=$(semver -i patch "$new")
-            new="$new-$suffix"
-            ;;
-    esac
-    echo "New incremented tag: $new"
 fi
 
 # set outputs
